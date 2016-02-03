@@ -1,0 +1,269 @@
+#!/bin/sh
+
+action="$1"
+comment="$2"
+
+if [ "$action" != 'get_mode_panel' ]; then
+  echo "===== $( date ) $action: $comment ====="
+fi
+
+function die() {
+  echo "DIE: $1"
+  exit 1
+}
+
+function app_on_workspace() {
+  # $1 ... app
+  # $2 ... app's window name
+  # $3 ... workspace number
+  $1 &>/dev/null &
+  pid=$!
+  while ! wmctrl -l -p | grep --quiet "\s$pid\s.*\s$2"; do
+    echo "DEBUG: Waiting for $2($pid, $1) to start"
+    if ! ps -o pid,cmd $pid | grep "$1"; then
+      echo "ERROR: App $2($pid, $1) failed to start"
+      return 1
+    fi
+    sleep 1
+  done
+  id=$( wmctrl -l -p | grep "\s$pid\s.*\s$2" | cut -d ' ' -f 1 )
+  wmctrl -i -r "$id" -t $3
+}
+
+function status() {
+  # $1 ... count for current "day" (default) or for this "week"
+  local period=${1:-day}
+  case $period in
+    day)
+      day_start=$( date -d "00:00 today" +%s )
+      day_end=$( date -d "00:00 tomorrow" +%s )
+      expected=8
+      tail_amount=70
+      ;;
+    week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$( date -d "next monday" +%s )
+      expected=40
+      tail_amount=350
+      ;;
+  esac
+  # Check tail_amount is sufficient
+  tail_start=$( tail -n $tail_amount ~/.timer.dat | head -n 1 | cut -d ' ' -f 1 )
+  if [ $tail_start -gt $day_start ]; then
+    echo "ERROR: Tailing database for $tail_amount lines not sufficient"
+    exit 100
+  fi
+  # Count time worked
+  echo "DEBUG: Displaying worked time from $( date -d @$day_start ) to $( date -d @$day_end )"
+  IFS=$'\x0A'$'\x0D'
+  row_start=$day_start
+  row_counted=''
+  worked=0
+  chunks=0
+  for row in $( tail -n $tail_amount ~/.timer.dat ); do
+    row_time=$( echo $row | cut -d ' ' -f 1 )
+    row_action=$( echo $row | cut -d ' ' -f 2 )
+    if [ "$row_action" = 'start:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+        row_start=$row_time
+        row_counted=false
+    fi
+    if [ "$row_action" = 'stop:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+        if [ $row_start -eq 0 ]; then
+          echo "WARN: Start mark for this $period not found, using start of the period"
+        fi
+        let worked+=$row_time-$row_start
+        if [ $row_time -le $row_start ]; then
+          echo "WARN: Started $( date -d @$row_start ) but stopped $( date -d @$row_time ) => zero or negative time worked - that is strange"
+        fi
+        let chunks+=1
+        row_counted=true
+    fi
+    if [ "$row_action" = 'worked:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+      hours=$( echo $row | cut -d ' ' -f 3 )
+      let worked+=$( echo "$hours * 3600" | bc | cut -d '.' -f 1 )
+    fi
+    if [ "$row_action" = 'needed:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+      hours=$( echo $row | cut -d ' ' -f 3 )
+      let worked-=$( echo "$hours * 3600" | bc | cut -d '.' -f 1 )
+    fi
+  done
+  if [ -n "$row_counted" ] && ! $row_counted; then
+    echo "WARN: Looks like last start still do not have it's stop, so considering stop now"
+    let worked+=$( date +%s )-$row_start
+    let chunks+=1
+  fi
+  # FIXME: If I'm calling just ststus and there is no final "stop:" mark, it do no work
+  echo "EXPECTED: $expected hours"
+  echo "WORKED: $( echo "scale=2; $worked/3600" | bc ) hours"
+  echo "CHUNKS: $chunks"
+}
+
+function apps() {
+  # Ensure all aps are running
+  if ! pidof xchat >/dev/null; then
+    app_on_workspace xchat 'XChat' 0 &
+  fi
+  if ! pidof sylpheed >/dev/null; then
+    app_on_workspace sylpheed 'Sylpheed' 2 &
+  fi
+  if ! ps -C firefox -o pid,cmd | grep 'firefox\s*--new-instance\s*-P\s*personal' >/dev/null; then
+    app_on_workspace 'firefox --new-instance -P personal' 'Mozilla Firefox' 4 &
+  fi
+  if ! ps -C firefox -o pid,cmd | grep 'firefox\s*--new-instance\s*-P\s*work' >/dev/null; then
+    app_on_workspace 'firefox --new-instance -P work' 'Mozilla Firefox' 1 &
+  fi
+  wait
+}
+
+function start() {
+  # If we are already started, ignore the request
+  if [ $( __get_mode ) = 'start' ]; then
+    echo "WARN: We are already started. Ignoring command."
+    return 1
+  fi
+  # Add start mark
+  echo "$( date +%s ) start: $comment" >> ~/.timer.dat
+  # Make sure toolbar plugin shows up2date status
+  __update_genmon
+  # Ensure apps are running
+  apps
+  # Set XChat to normal nick (in case it is ..._afk)
+  xchat --existing --command="ALLSERV NICK jhutar"
+}
+
+function stop() {
+  # If we are already stopped, ignore the request
+  if [ $( __get_mode ) = 'stop' ]; then
+    echo "WARN: We are already stopped. Ignoring command."
+    return 1
+  fi
+  # Add stop mark
+  echo "$( date +%s ) stop: $comment" >> ~/.timer.dat
+  # Make sure toolbar plugin shows up2date status
+  __update_genmon
+  # Set XChat to ..._afk
+  if pidof xchat >/dev/null; then
+    xchat --existing --command="ALLSERV NICK jhutar_afk"
+  fi
+  # Show time worked
+  status week
+  status
+}
+
+function __update_genmon() {
+  # If we have genmon plugin running, restart it
+  # FIXME: Some check if that is "our" genmon plugin would be nice :-)
+  genmon_pid=$( pgrep --full '.*/usr/lib64/xfce4/panel/plugins/libgenmon.so.*' )
+  if echo "$genmon_pid" | grep --quiet '^[0-9]*$'; then
+    /usr/bin/kill -s USR1 $genmon_pid
+  fi
+}
+
+function __get_mode() {
+  local tail_amount=20
+  tail -n $tail_amount ~/.timer.dat \
+    | grep '^[0-9]\+ \(start\|stop\): .*$' \
+    | tail -n 1 \
+    | sed 's/^[0-9]\+ \(start\|stop\): .*$/\1/'
+}
+
+function get_mode_panel() {
+  # ...
+  local mode=$( __get_mode )
+  if [ "$mode" = 'start' ]; then
+      echo "<img>/usr/share/icons/gnome/32x32/actions/media-playback-start.png</img>"
+      echo "<click>/home/pok/timer.sh stop 'Stopping from panel'</click>"
+  elif [ "$mode" = 'stop' ]; then
+      echo "<img>/usr/share/icons/gnome/32x32/actions/media-playback-stop.png</img>"
+      echo "<click>/home/pok/timer.sh start 'Starting from panel'</click>"
+  else
+    echo "ERROR: Mode not detected"
+  fi
+}
+
+function switch_mode_panel() {
+  # This...
+  local mode=$( __get_mode )
+  if [ "$mode" = 'start' ]; then
+    comment='Mode switched from panel. Stopping work now.'
+    stop
+  elif [ "$mode" = 'stop' ]; then
+    comment='Mode switched from panel. Starting work now.'
+    start
+  else
+    echo "ERROR: Mode not detected"
+  fi
+}
+
+function worked() {
+  # When I have worked sometime else
+  #   $1 ... in hours
+  #   $2 ... comment
+  echo "$( date +%s ) worked: $1 $2" >> ~/.timer.dat
+}
+
+function needed() {
+  # When I have not worked enough last week and I have to finish now
+  #   $1 ... in hours
+  #   $2 ... comment
+  echo "$( date +%s ) needed: $1 $2" >> ~/.timer.dat
+}
+
+function message() {
+  echo "$( date +%s ) message: $1" >> ~/.timer.dat
+}
+
+function work_setup() {
+  local internal='eDP1'
+  local external=''
+  xrandr | grep --quiet "^$internal connected" || die "No $internal in xrandr output"
+  [ -z "$external" ] && xrandr | grep --quiet "^DP-1-2 connected" && external='DP-1-2'
+  [ -z "$external" ] && xrandr | grep --quiet "^VGA-0 connected" && external='VGA-0'
+  [ -z "$external" ] && xrandr | grep --quiet "^DP2-2 connected" && external='DP2-2'
+  [ -z "$external" ] && die "No known external screen in xrandr output"
+  if [ "$1" = 'to_work' ]; then
+    xrandr --output $external --auto
+    echo "INFO: xrandr: $external enabled: $?"
+    xrandr --output $internal --off
+    echo "INFO: xrandr: $internal disabled: $?"
+    xfconf-query -c keyboards -p "/Default/KeyRepeat/Delay" -s 201   # we have to *change* the value, so setting this fake one first
+    xfconf-query -c keyboards -p "/Default/KeyRepeat/Delay" -s 200
+    echo "INFO: xfconf-query: keyboards/Default/KeyRepeat/Delay set: $?"
+    xfconf-query -c keyboards -p "/Default/KeyRepeat/Rate" -s 51   # we have to *change* the value, so setting this fake one first
+    xfconf-query -c keyboards -p "/Default/KeyRepeat/Rate" -s 50
+    echo "INFO: xfconf-query: keyboards/Default/KeyRepeat/Rate set: $?"
+  else
+    xrandr --output $internal --auto
+    echo "INFO: xrandr: $internal enabled: $?"
+    xrandr --output $external --off
+    echo "INFO: xrandr: $external disabled: $?"
+  fi
+}
+
+case $action in
+  start) start;;
+  stop) stop;;
+  get_mode_panel) get_mode_panel;;
+  switch_mode_panel) switch_mode_panel;;
+  apps) apps;;
+  worked) worked "$2" "$3";;
+  needed) needed "$2" "$3";;
+  status) status day;;
+  status_week) status week;;
+  message) message;;
+  to_work) work_setup to_work; message "Entering work";;
+  from_work) work_setup from_work; message "Leaving work";;
+  *) echo "ERROR: Unknown command"; exit 1;;
+esac
