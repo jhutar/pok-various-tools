@@ -253,17 +253,30 @@ function work_setup() {
 }
 
 case $action in
+  # $ timer start 'Just came from lunch'
   start) start;;
+  # $ timer stop 'Going to lunch'
   stop) stop;;
+  # For use by xfce4-genmon-plugin
   get_mode_panel) get_mode_panel;;
+  # For use by xfce4-genmon-plugin and by keyboard shortcut
   switch_mode_panel) switch_mode_panel;;
+  # $ timer apps
+  # Start mine favourite apps and put them to correct desktops
   apps) apps;;
+  # $ timer worked 1 'Worked 1 extra hour over the weekend'
   worked) worked "$2" "$3";;
+  # $ timer needed 1 'Oh my, I have fallen asleep 1 hour ago while working'
   needed) needed "$2" "$3";;
+  # How many hours have I worked today?
   status) status day;;
+  # How many hours have I worked this week?
   status_week) status week;;
+  # Just record some message to the log
   message) message;;
+  # Configure me as I have just put laptop to the docking station in the office
   to_work) work_setup to_work; message "Entering work";;
+  # Leavin docking station now
   from_work) work_setup from_work; message "Leaving work";;
   *) echo "ERROR: Unknown command"; exit 1;;
 esac
