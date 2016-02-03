@@ -40,6 +40,12 @@ function status() {
       expected=8
       tail_amount=70
       ;;
+    yesterday)
+      day_start=$( date -d "00:00 2 days ago" +%s )
+      day_end=$( date -d "00:00 today" +%s )
+      expected=8
+      tail_amount=140
+      ;;
     week)
       if date +%a | grep --quiet 'Mon'; then
         day_start=$( date -d "00:00 today" +%s )
@@ -50,7 +56,23 @@ function status() {
       expected=40
       tail_amount=350
       ;;
+    last_week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$day_start
+      let day_start-=$( expr 7 \* 24 \* 3600 )
+      expected=40
+      tail_amount=700
+      ;;
+    *)
+      echo "ERROR: Unknown period. Use day/yesterday/week/last_week"
+      exit 1
+      ;;
   esac
+  echo "DEBUG: day_start = '$day_start', day_end = '$day_end', expected = '$expected', tail_amount = '$tail_amount'"
   # Check tail_amount is sufficient
   tail_start=$( tail -n $tail_amount ~/.timer.dat | head -n 1 | cut -d ' ' -f 1 )
   if [ $tail_start -gt $day_start ]; then
@@ -268,10 +290,9 @@ case $action in
   worked) worked "$2" "$3";;
   # $ timer needed 1 'Oh my, I have fallen asleep 1 hour ago while working'
   needed) needed "$2" "$3";;
-  # How many hours have I worked today?
-  status) status day;;
-  # How many hours have I worked this week?
-  status_week) status week;;
+  # $ timer status <range>
+  # How many hours have I worked day/yesterday/week/last_week? 'day' is a default.
+  status) status "$2";;
   # Just record some message to the log
   message) message;;
   # Configure me as I have just put laptop to the docking station in the office
