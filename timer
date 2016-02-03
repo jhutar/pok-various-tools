@@ -206,10 +206,10 @@ function get_mode_panel() {
   local mode=$( __get_mode )
   if [ "$mode" = 'start' ]; then
       echo "<img>/usr/share/icons/gnome/32x32/actions/media-playback-start.png</img>"
-      echo "<click>/home/pok/timer.sh stop 'Stopping from panel'</click>"
+      echo "<click>/home/pok/bin/timer stop 'Stopping from panel'</click>"
   elif [ "$mode" = 'stop' ]; then
       echo "<img>/usr/share/icons/gnome/32x32/actions/media-playback-stop.png</img>"
-      echo "<click>/home/pok/timer.sh start 'Starting from panel'</click>"
+      echo "<click>/home/pok/bin/timer start 'Starting from panel'</click>"
   else
     echo "ERROR: Mode not detected"
   fi
