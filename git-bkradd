@@ -1,0 +1,29 @@
+#!/bin/bash
+
+LOCKFILE=/tmp/git-bkradd.lock
+
+function bye() {
+  [ -x "$( type -p zenity )" ] && zenity --error --text "$1"
+  exit 1
+}
+
+while true; do
+  if [ ! -e $LOCKFILE ]; then
+    break
+  fi
+  if ! ps $( cat $LOCKFILE ) >/dev/null; then
+    rm $LOCKFILE || bye "LOCKFILE with incorrect pid cleanup failed"
+    break
+  fi
+  echo -n '.'
+  sleep 3
+done
+
+echo $$ >$LOCKFILE || bye "LOCKFILE creation failed"
+trap "rm $LOCKFILE" EXIT
+
+git pull --rebase || bye "'git pull --rebase' failed in $( pwd )"
+git push || bye "'git push' failed in $( pwd )"
+make tag || bye "'make tag' failed in $( pwd )"
+git push --tags || bye "'git push --tags' failed in $( pwd )"
+make bkradd || bye "'make bkradd' failed in $( pwd )"
