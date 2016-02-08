@@ -72,7 +72,7 @@ function status() {
       exit 1
       ;;
   esac
-  echo "DEBUG: day_start = '$day_start', day_end = '$day_end', expected = '$expected', tail_amount = '$tail_amount'"
+  #echo "DEBUG: day_start = '$day_start', day_end = '$day_end', expected = '$expected', tail_amount = '$tail_amount'"
   # Check tail_amount is sufficient
   tail_start=$( tail -n $tail_amount ~/.timer.dat | head -n 1 | cut -d ' ' -f 1 )
   if [ $tail_start -gt $day_start ]; then
@@ -80,7 +80,7 @@ function status() {
     exit 100
   fi
   # Count time worked
-  echo "DEBUG: Displaying worked time from $( date -d @$day_start ) to $( date -d @$day_end )"
+  #echo "DEBUG: Displaying worked time from $( date -d @$day_start ) to $( date -d @$day_end )"
   IFS=$'\x0A'$'\x0D'
   row_start=$day_start
   row_counted=''
