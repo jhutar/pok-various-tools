@@ -2,6 +2,7 @@
 
 action="$1"
 comment="$2"
+fmt="+%Y-%m-%d %H:%M"
 
 if [ "$action" != 'get_mode_panel' ]; then
   echo "===== $( date ) $action: $comment ====="
@@ -102,6 +103,7 @@ function status() {
           echo "WARN: Start mark for this $period not found, using start of the period"
         fi
         let worked+=$row_time-$row_start
+        echo "DEBUG: Worked from $( date -d @$row_start $fmt ) to $( date -d @$row_time $fmt )"
         if [ $row_time -le $row_start ]; then
           echo "WARN: Started $( date -d @$row_start ) but stopped $( date -d @$row_time ) => zero or negative time worked - that is strange"
         fi
@@ -113,12 +115,14 @@ function status() {
          -a $row_time -le $day_end ]; then
       hours=$( echo $row | cut -d ' ' -f 3 )
       let worked+=$( echo "$hours * 3600" | bc | cut -d '.' -f 1 )
+      echo "DEBUG: Worked time $hours ($( echo $row | sed 's/^[^ ]\+ [^ ]\+ [^ ]\+ //' ))"
     fi
     if [ "$row_action" = 'needed:' \
          -a $row_time -ge $day_start \
          -a $row_time -le $day_end ]; then
       hours=$( echo $row | cut -d ' ' -f 3 )
       let worked-=$( echo "$hours * 3600" | bc | cut -d '.' -f 1 )
+      echo "DEBUG: Needed time $hours ($( echo $row | sed 's/^[^ ]\+ [^ ]\+ [^ ]\+ //' ))"
     fi
   done
   if [ -n "$row_counted" ] && ! $row_counted; then
