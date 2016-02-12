@@ -31,6 +31,124 @@ function app_on_workspace() {
   wmctrl -i -r "$id" -t $3
 }
 
+function histogram() {
+  # $1 ... count for current "day" (default) or for this "week"
+  local period=${1:-day}
+  case $period in
+    all)
+      day_start=$( head -n 1 ~/.timer.dat | cut -d ' ' -f 1 )
+      day_end=$( date +%s )
+      tail_amount=1000000000
+      ;;
+    day)
+      day_start=$( date -d "00:00 today" +%s )
+      day_end=$( date -d "00:00 tomorrow" +%s )
+      tail_amount=70
+      ;;
+    yesterday)
+      day_start=$( date -d "00:00 day ago" +%s )
+      day_end=$( date -d "00:00 today" +%s )
+      tail_amount=140
+      ;;
+    week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$( date -d "next monday" +%s )
+      tail_amount=350
+      ;;
+    last_week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$day_start
+      let day_start-=$( expr 7 \* 24 \* 3600 )
+      tail_amount=700
+      ;;
+    *)
+      echo "ERROR: Unknown period. Use day/yesterday/week/last_week"
+      exit 1
+      ;;
+  esac
+  echo "DEBUG: day_start = '$day_start', day_end = '$day_end', tail_amount = '$tail_amount'"
+  # Check tail_amount is sufficient
+  tail_start=$( tail -n $tail_amount ~/.timer.dat | head -n 1 | cut -d ' ' -f 1 )
+  if [ $tail_start -gt $day_start ]; then
+    echo "ERROR: Tailing database for $tail_amount lines not sufficient ($tail_start vs. $day_start)"
+    exit 100
+  fi
+  # Go through DB
+  histogram=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  IFS=$'\x0A'$'\x0D'
+  row_start=0
+  row_counted=''
+  worked=0
+  chunks=0
+  for row in $( tail -n $tail_amount ~/.timer.dat ); do
+    row_time=$( echo $row | cut -d ' ' -f 1 )
+    row_action=$( echo $row | cut -d ' ' -f 2 )
+    if [ "$row_action" = 'start:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+        row_start=$row_time
+        row_counted=false
+    fi
+    if [ "$row_action" = 'stop:' \
+         -a $row_time -ge $day_start \
+         -a $row_time -le $day_end ]; then
+        if [ $row_start -eq 0 ]; then
+          echo "WARN: Start mark for this $period not found, using start of the period"
+          row_start=$day_start
+        fi
+        for hour in $( seq -w $( date -d @$row_start +%H ) $( date -d @$row_time +%H ) ); do
+          ###echo "DEBUG: Processing hour $hour"
+          id=$( expr $hour - 1 )
+          interval_start=$( date -d "$( date -d @$row_start +%Y-%m-%d ) $hour:00:00" +%s )
+          [ $interval_start -lt $row_start ] && interval_start=$row_start
+          interval_end=$( date -d "$( date -d @$row_start +%Y-%m-%d ) $hour:59:59" +%s )
+          [ $interval_end -gt $row_time ] && interval_end=$row_time
+          interval=$( expr $interval_end - $interval_start )
+          ###echo "DEBUG: Interval for hour $hour: $interval_start - $interval_end [$( date -d @$interval_start $fmt ) - $( date -d @$interval_end $fmt )] (i.e. $( echo "scale=2; $interval/3600" | bc ) hours)"
+          ###echo -n "DEBUG: before: '${histogram[$id]}'"
+          histogram[$id]=$( expr ${histogram[$id]} + $interval )
+          ###echo " after '${histogram[$id]}'"
+        done
+        ###echo "DEBUG: Worked from $( date -d @$row_start $fmt ) to $( date -d @$row_time $fmt )"
+        if [ $row_time -le $row_start ]; then
+          echo "WARN: Started $( date -d @$row_start ) but stopped $( date -d @$row_time ) => zero or negative time worked - that is strange"
+        fi
+        let chunks+=1
+        row_counted=true
+    fi
+  done
+  #### FIXME: Ignoring this
+  ###if [ -n "$row_counted" ] && ! $row_counted; then
+  ###  echo "WARN: Looks like last start still do not have it's stop, so considering stop now"
+  ###  let worked+=$( date +%s )-$row_start
+  ###  let chunks+=1
+  ###fi
+  ###echo "HISTOGRAM: ${histogram[*]}"
+  histogram_max=0
+  for i in "${!histogram[@]}"; do
+    [ ${histogram[$i]} -gt $histogram_max ] && histogram_max=${histogram[$i]}
+  done
+  histogram_width=50
+  histogram_step=$( expr $histogram_max / $histogram_width )
+  echo -e "hour\t|"
+  echo "--------+--------------------------------------------------"
+  for i in "${!histogram[@]}"; do
+    # FIXME: lack of rounding in bash causes that even for 0 seconds worked one hash is printed
+    width=$( expr ${histogram[$i]} / $histogram_step )
+    number=$( printf "%-8s" "$i" )
+    hashes=$( printf "%-${width}s" "#" | sed 's/ /#/g' )
+    echo "$number|$hashes"
+  done
+}
+
 function status() {
   # $1 ... count for current "day" (default) or for this "week"
   local period=${1:-day}
@@ -42,7 +160,7 @@ function status() {
       tail_amount=70
       ;;
     yesterday)
-      day_start=$( date -d "00:00 2 days ago" +%s )
+      day_start=$( date -d "00:00 day ago" +%s )
       day_end=$( date -d "00:00 today" +%s )
       expected=8
       tail_amount=140
@@ -77,13 +195,13 @@ function status() {
   # Check tail_amount is sufficient
   tail_start=$( tail -n $tail_amount ~/.timer.dat | head -n 1 | cut -d ' ' -f 1 )
   if [ $tail_start -gt $day_start ]; then
-    echo "ERROR: Tailing database for $tail_amount lines not sufficient"
+    echo "ERROR: Tailing database for $tail_amount lines not sufficient ($tail_start vs. $day_start)"
     exit 100
   fi
   # Count time worked
   #echo "DEBUG: Displaying worked time from $( date -d @$day_start ) to $( date -d @$day_end )"
   IFS=$'\x0A'$'\x0D'
-  row_start=$day_start
+  row_start=0
   row_counted=''
   worked=0
   chunks=0
@@ -101,6 +219,7 @@ function status() {
          -a $row_time -le $day_end ]; then
         if [ $row_start -eq 0 ]; then
           echo "WARN: Start mark for this $period not found, using start of the period"
+          row_start=$day_start
         fi
         let worked+=$row_time-$row_start
         echo "DEBUG: Worked from $( date -d @$row_start $fmt ) to $( date -d @$row_time $fmt )"
@@ -303,5 +422,7 @@ case $action in
   to_work) work_setup to_work; message "Entering work";;
   # Leavin docking station now
   from_work) work_setup from_work; message "Leaving work";;
+  # Histogram
+  histogram) histogram "$2";;
   *) echo "ERROR: Unknown command"; exit 1;;
 esac
