@@ -222,7 +222,7 @@ function status() {
           row_start=$day_start
         fi
         let worked+=$row_time-$row_start
-        echo "DEBUG: Worked from $( date -d @$row_start $fmt ) to $( date -d @$row_time $fmt )"
+        echo "DEBUG: Worked from $( date -d @$row_start $fmt ) to $( date -d @$row_time $fmt ) - i.e. $( echo "scale=2; $( expr $row_time - $row_start )/3600" | bc )"
         if [ $row_time -le $row_start ]; then
           echo "WARN: Started $( date -d @$row_start ) but stopped $( date -d @$row_time ) => zero or negative time worked - that is strange"
         fi
@@ -370,6 +370,14 @@ function message() {
   echo "$( date +%s ) message: $1" >> ~/.timer.dat
 }
 
+function watch() {
+  tailf -n 1 ~/.timer.dat | while read row; do
+    timestamp=$( echo "$row" | cut -d ' ' -f 1 )
+    rest=$( echo "$row" | sed 's/^[0-9]\+ //' )
+    echo "$( date -d @$timestamp "$fmt" ) $rest"
+  done
+}
+
 function work_setup() {
   local internal='eDP1'
   local external=''
@@ -424,5 +432,7 @@ case $action in
   from_work) work_setup from_work; message "Leaving work";;
   # Histogram
   histogram) histogram "$2";;
+  # Continuously watch the log
+  watch) watch;;
   *) echo "ERROR: Unknown command"; exit 1;;
 esac
