@@ -3,7 +3,11 @@
 LOCKFILE=/tmp/git-bkradd.lock
 
 function bye() {
-  [ -x "$( type -p zenity )" ] && zenity --error --text "$1"
+  if [ -x "$( type -p zenity )" ]; then
+    zenity --error --text "$1"
+  else
+    echo "ERROR: $1" >&2
+  fi
   exit 1
 }
 
@@ -22,6 +26,7 @@ done
 echo $$ >$LOCKFILE || bye "LOCKFILE creation failed"
 trap "rm $LOCKFILE" EXIT
 
+[ -r Makefile -a -r runtest.sh ] || bye "'Makefile' or 'runtest.sh' is missing in current directory. Is this a Beaker test?"
 git pull --rebase || bye "'git pull --rebase' failed in $( pwd )"
 git push || bye "'git push' failed in $( pwd )"
 make tag || bye "'make tag' failed in $( pwd )"
