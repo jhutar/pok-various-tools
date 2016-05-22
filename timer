@@ -14,7 +14,7 @@ function die() {
 }
 
 function app_on_workspace() {
-  # $1 ... app
+  # $1 ... app's command line
   # $2 ... app's window name
   # $3 ... workspace number
   $1 &>/dev/null &
@@ -260,8 +260,8 @@ function apps() {
   if ! pidof xchat >/dev/null; then
     app_on_workspace xchat 'XChat' 0 &
   fi
-  if ! pidof sylpheed >/dev/null; then
-    app_on_workspace sylpheed 'Sylpheed' 2 &
+  if ! pidof mutt >/dev/null; then
+    app_on_workspace 'xfce4-terminal --disable-server --maximize --title=muttterm --command=mutt --working-directory=~/Desktop/ --hide-toolbar --hide-menubar --hide-borders' 'muttterm' 2 &
   fi
   if ! ps -C firefox -o pid,cmd | grep 'firefox\s*--new-instance\s*-P\s*personal' >/dev/null; then
     app_on_workspace 'firefox --new-instance -P personal' 'Mozilla Firefox' 4 &
