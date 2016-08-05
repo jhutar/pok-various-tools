@@ -28,6 +28,7 @@ trap "rm $LOCKFILE" EXIT
 
 [ -r Makefile -a -r runtest.sh ] || bye "'Makefile' or 'runtest.sh' is missing in current directory. Is this a Beaker test?"
 git pull --rebase || bye "'git pull --rebase' failed in $( pwd )"
+git pull --tags || bye "'git pull --tags' failed in $( pwd )"
 git push || bye "'git push' failed in $( pwd )"
 make tag || bye "'make tag' failed in $( pwd )"
 git push --tags || bye "'git push --tags' failed in $( pwd )"
