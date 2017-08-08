@@ -245,8 +245,13 @@ function status() {
     fi
   done
   if [ -n "$row_counted" ] && ! $row_counted; then
-    echo "WARN: Looks like last start still do not have it's stop, so considering stop now"
-    let worked+=$( date +%s )-$row_start
+    if [ $( date +%s ) -gt $day_end ]; then
+      echo "WARN: Looks like last start at $( date -d @$row_start $fmt ) still do not have it's stop, so considering stop end of investigated interval $( date -d @$day_end $fmt )"
+      let worked+=$day_end-$row_start
+    else
+      echo "WARN: Looks like last start at $( date -d @$row_start $fmt ) still do not have it's stop, so considering stop now $( date $fmt )"
+      let worked+=$( date +%s )-$row_start
+    fi
     let chunks+=1
   fi
   # FIXME: If I'm calling just ststus and there is no final "stop:" mark, it do no work
@@ -379,12 +384,13 @@ function watch() {
 }
 
 function work_setup() {
-  local internal='eDP1'
+  local internal='eDP-1'
   local external=''
   xrandr | grep --quiet "^$internal connected" || die "No $internal in xrandr output"
   [ -z "$external" ] && xrandr | grep --quiet "^DP-1-2 connected" && external='DP-1-2'
   [ -z "$external" ] && xrandr | grep --quiet "^VGA-0 connected" && external='VGA-0'
   [ -z "$external" ] && xrandr | grep --quiet "^DP2-2 connected" && external='DP2-2'
+  [ -z "$external" ] && xrandr | grep --quiet "^DP-2-2 connected" && external='DP-2-2'
   [ -z "$external" ] && die "No known external screen in xrandr output"
   if [ "$1" = 'to_work' ]; then
     xrandr --output $external --auto

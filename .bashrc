@@ -40,5 +40,11 @@ alias git-pp='git-pull --rebase && git-push'
 
 alias yum='dnf'
 
+function cdg(){
+	cd ~/Checkouts/GIT/
+	clear
+	[ -n "$1" ] && cd "$1"
+}
+
 # Make history bigger
 export HISTSIZE=50000
