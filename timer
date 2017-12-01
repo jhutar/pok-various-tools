@@ -262,11 +262,11 @@ function status() {
 
 function apps() {
   # Ensure all aps are running
-  if ! pidof xchat >/dev/null; then
-    app_on_workspace xchat 'XChat' 0 &
+  if ! pidof hexchat >/dev/null; then
+    app_on_workspace hexchat 'HexChat' 0 &
   fi
-  if ! pidof mutt >/dev/null; then
-    app_on_workspace 'xfce4-terminal --disable-server --maximize --title=muttterm --command=mutt --working-directory=~/Desktop/ --hide-toolbar --hide-menubar --hide-borders' 'muttterm' 2 &
+  if ! pidof neomutt >/dev/null; then
+    app_on_workspace 'xfce4-terminal --disable-server --maximize --title=muttterm --command=neomutt --working-directory=~/Desktop/ --hide-toolbar --hide-menubar --hide-borders' 'muttterm' 2 &
   fi
   if ! ps -C firefox -o pid,cmd | grep 'firefox\s*--new-instance\s*-P\s*personal' >/dev/null; then
     app_on_workspace 'firefox --new-instance -P personal' 'Mozilla Firefox' 4 &
@@ -290,7 +290,7 @@ function start() {
   # Ensure apps are running
   apps
   # Set XChat to normal nick (in case it is ..._afk)
-  xchat --existing --command="ALLSERV NICK jhutar"
+  hexchat --existing --command="ALLSERV NICK jhutar"
 }
 
 function stop() {
@@ -304,8 +304,8 @@ function stop() {
   # Make sure toolbar plugin shows up2date status
   __update_genmon
   # Set XChat to ..._afk
-  if pidof xchat >/dev/null; then
-    xchat --existing --command="ALLSERV NICK jhutar_afk"
+  if pidof hexchat >/dev/null; then
+    hexchat --existing --command="ALLSERV NICK jhutar_afk"
   fi
   # Show time worked
   status week
