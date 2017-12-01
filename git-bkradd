@@ -27,6 +27,7 @@ echo $$ >$LOCKFILE || bye "LOCKFILE creation failed"
 trap "rm $LOCKFILE" EXIT
 
 [ -r Makefile -a -r runtest.sh ] || bye "'Makefile' or 'runtest.sh' is missing in current directory. Is this a Beaker test?"
+[ -r /usr/share/rhts/lib/rhts-make.include ] || bye "File '/usr/share/rhts/lib/rhts-make.include' not available. Maybe package 'rhts-devel' is not installed?"
 git pull --rebase || bye "'git pull --rebase' failed in $( pwd )"
 git pull --tags || bye "'git pull --tags' failed in $( pwd )"
 git push || bye "'git push' failed in $( pwd )"
