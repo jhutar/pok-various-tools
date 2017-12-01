@@ -23,6 +23,7 @@ for f in /tmp/first.log /tmp/second.log; do
     sed -i '/^MARK-LWD-LOOP/d' $f
     sed -i 's/:: \[   LOG    \] :: Duration: [0-9].*/:: [   LOG    ] :: Duration: DURATION/g' $f
     sed -i 's/:: \[   LOG    \] :: Test run ID   : [0-9]\+/:: [   LOG    ] :: Test run ID   : TESTID/g' $f
+    sed -i 's/[a-z0-9.-]\+.redhat.com/SOME_HOSTNAME/g' $f
     sed -i '/^$/d' $f
 done
 
