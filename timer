@@ -69,8 +69,20 @@ function histogram() {
       let day_start-=$( expr 7 \* 24 \* 3600 )
       tail_amount=700
       ;;
+    last2_week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$day_start
+      let day_start-=$( expr 7 \* 24 \* 3600 )
+      day_start=$( expr $day_start - 7 \* 24 \* 3600 )
+      day_end=$( expr $day_end - 7 \* 24 \* 3600 )
+      tail_amount=1050
+      ;;
     *)
-      echo "ERROR: Unknown period. Use day/yesterday/week/last_week"
+      echo "ERROR: Unknown period. Use day/yesterday/week/last_week/last2_week"
       exit 1
       ;;
   esac
@@ -186,8 +198,21 @@ function status() {
       expected=40
       tail_amount=700
       ;;
+    last2_week)
+      if date +%a | grep --quiet 'Mon'; then
+        day_start=$( date -d "00:00 today" +%s )
+      else
+        day_start=$( date -d "last monday" +%s )
+      fi
+      day_end=$day_start
+      let day_start-=$( expr 7 \* 24 \* 3600 )
+      day_start=$( expr $day_start - 7 \* 24 \* 3600 )
+      day_end=$( expr $day_end - 7 \* 24 \* 3600 )
+      expected=40
+      tail_amount=1050
+      ;;
     *)
-      echo "ERROR: Unknown period. Use day/yesterday/week/last_week"
+      echo "ERROR: Unknown period. Use day/yesterday/week/last_week/last2_week"
       exit 1
       ;;
   esac
