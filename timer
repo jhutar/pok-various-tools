@@ -167,23 +167,15 @@ function slack_set_status() {
         return 1
     fi
 
-    case $1 in
-        normal)
-            profile='{"status_text": "Working", "status_emoji": ":simple_smile:"}'
-            ;;
-        afk)
-            profile='{"status_text": "Away from keyboard", "status_emoji": ":tea:"}'
-            ;;
-        *)
-            echo "WARNING: Incorrect slack status" >&2
-            return 1
-            ;;
-    esac
+    if [ "$1" != "auto" -a "$1" != "away" ]; then
+        echo "WARNING: Attempting to set unknown Slack status" >&2
+        return 1
+    fi
 
     source ~/.config/slack
     for token in ${TOKENS[@]}; do
-        curl -X POST https://slack.com/api/users.profile.set \
-            --silent --data "profile=$profile" --data "token=$token" \
+        curl -X POST https://slack.com/api/users.setPresence \
+            --silent --data "presence=$1" --data "token=$token" \
             | jq .ok
     done
 }
@@ -344,7 +336,7 @@ function start() {
   # Set XChat to normal nick (in case it is ..._afk)
   hexchat --existing --command="ALLSERV NICK jhutar"
   # Set Slack to normal nick
-  slack_set_status normal
+  slack_set_status auto
 }
 
 function stop() {
@@ -362,7 +354,7 @@ function stop() {
     hexchat --existing --command="ALLSERV NICK jhutar_afk"
   fi
   # Set Slack to afk nick
-  slack_set_status afk
+  slack_set_status away
   # Show time worked
   status week
   status
