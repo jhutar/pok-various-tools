@@ -161,6 +161,33 @@ function histogram() {
   done
 }
 
+function slack_set_status() {
+    if ! [ -r ~/.config/slack ]; then
+        echo "WARNING: Slack config not found" >&2
+        return 1
+    fi
+
+    case $1 in
+        normal)
+            profile='{"status_text": "Working", "status_emoji": ":simple_smile:"}'
+            ;;
+        afk)
+            profile='{"status_text": "Away from keyboard", "status_emoji": ":tea:"}'
+            ;;
+        *)
+            echo "WARNING: Incorrect slack status" >&2
+            return 1
+            ;;
+    esac
+
+    source ~/.config/slack
+    for token in ${TOKENS[@]}; do
+        curl -X POST https://slack.com/api/users.profile.set \
+            --silent --data "profile=$profile" --data "token=$token" \
+            | jq .ok
+    done
+}
+
 function status() {
   # $1 ... count for current "day" (default) or for this "week"
   local period=${1:-day}
@@ -316,6 +343,8 @@ function start() {
   apps
   # Set XChat to normal nick (in case it is ..._afk)
   hexchat --existing --command="ALLSERV NICK jhutar"
+  # Set Slack to normal nick
+  slack_set_status normal
 }
 
 function stop() {
@@ -332,6 +361,8 @@ function stop() {
   if pidof hexchat >/dev/null; then
     hexchat --existing --command="ALLSERV NICK jhutar_afk"
   fi
+  # Set Slack to afk nick
+  slack_set_status afk
   # Show time worked
   status week
   status
@@ -412,6 +443,7 @@ function work_setup() {
   local internal='eDP-1'
   local external=''
   xrandr | grep --quiet "^$internal connected" || die "No $internal in xrandr output"
+  [ -z "$external" ] && xrandr | grep --quiet "^DP-1-1-1 connected" && external='DP-1-1-1'
   [ -z "$external" ] && xrandr | grep --quiet "^DP-1-2 connected" && external='DP-1-2'
   [ -z "$external" ] && xrandr | grep --quiet "^VGA-0 connected" && external='VGA-0'
   [ -z "$external" ] && xrandr | grep --quiet "^DP2-2 connected" && external='DP2-2'
