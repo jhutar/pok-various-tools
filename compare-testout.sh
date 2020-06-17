@@ -1,8 +1,13 @@
 #!/bin/sh
 
-zenity_out=$( zenity --title "Provide logs" --forms --text "Please provide links to the TESTOUT.log files you want to compare" --add-entry "First log" --add-entry "Second log" )
-first=$( echo "$zenity_out" | cut -d '|' -f 1 )
-second=$( echo "$zenity_out" | cut -d '|' -f 2 )
+if [ "$#" -eq 2 ]; then
+    first=$1
+    second=$2
+else
+    zenity_out=$( zenity --title "Provide logs" --forms --text "Please provide links to the TESTOUT.log files you want to compare" --add-entry "First log" --add-entry "Second log" )
+    first=$( echo "$zenity_out" | cut -d '|' -f 1 )
+    second=$( echo "$zenity_out" | cut -d '|' -f 2 )
+fi
 
 wget -O /tmp/first.log $first
 wget -O /tmp/second.log $second
@@ -24,6 +29,8 @@ for f in /tmp/first.log /tmp/second.log; do
     sed -i 's/:: \[   LOG    \] :: Duration: [0-9].*/:: [   LOG    ] :: Duration: DURATION/g' $f
     sed -i 's/:: \[   LOG    \] :: Test run ID   : [0-9]\+/:: [   LOG    ] :: Test run ID   : TESTID/g' $f
     sed -i 's/[a-z0-9.-]\+.redhat.com/SOME_HOSTNAME/g' $f
+    sed -i 's/Finish after [0-9]\+ seconds/Finish after DURATION seconds/g' $f
+    sed -i 's/Examined \(.*\) for \(.*\): [0-9]\+ \/ [0-9]\+ = [0-9.]\+ (ranging from [0-9]\+ to [0-9]\+)/Examined \1 for \2: SUM \/ COUNT = AVG (ranging from START to END)/' $f
     sed -i '/^$/d' $f
 done
 
