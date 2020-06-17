@@ -176,7 +176,8 @@ function slack_set_status() {
     for token in ${TOKENS[@]}; do
         curl -X POST https://slack.com/api/users.setPresence \
             --silent --data "presence=$1" --data "token=$token" \
-            | jq .ok
+            | jq .ok | grep --quiet 'true' \
+                || echo "WARNING: Slack status change failed" >&2
     done
 }
 
